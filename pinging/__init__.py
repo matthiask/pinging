@@ -5,16 +5,16 @@ from django.utils.functional import curry
 from pinging.models import PingedURL
 
 
-PINGING_WEBLOG_NAME = settings.PINGING_WEBLOG_NAME
-PINGING_WEBLOG_URL = settings.PINGING_WEBLOG_URL
-
-
 def register(model, **kwargs):
     """
     Example:
     pinging.register(YourModel, weblogname='something', weblogurl='somethingelse')
-
     """
+
+    if not all(hasattr(settings, key) for key in (
+            'PINGING_WEBLOG_NAME', 'PINGING_WEBLOG_URL')):
+        raise ImproperlyConfigured, 'You have to specify PINGING_WEBLOG_NAME '\
+            'and PINGING_WEBLOG_URL to be able to use ``pinging.register``,'
 
     # reference must not be weak because the receiver is dynamically constructed here
     signals.post_save.connect(curry(post_save_handler, **kwargs), sender=model, weak=False)
@@ -25,8 +25,8 @@ def post_save_handler(signal, sender, instance, created, **kwargs):
         return
 
     create_kwargs = {
-        'weblogname': kwargs.get('weblogname', PINGING_WEBLOG_NAME),
-        'weblogurl': kwargs.get('weblogurl', PINGING_WEBLOG_URL),
+        'weblogname': kwargs.get('weblogname', settings.PINGING_WEBLOG_NAME),
+        'weblogurl': kwargs.get('weblogurl', settings.PINGING_WEBLOG_URL),
         }
 
     if hasattr(instance, 'get_absolute_url'):
