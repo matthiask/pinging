@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import signals
 from django.utils.functional import curry
 
@@ -7,17 +8,24 @@ from pinging.models import PingedURL
 
 def register(model, **kwargs):
     """
-    Example:
-    pinging.register(YourModel, weblogname='something', weblogurl='somethingelse')
+    Example::
+
+        pinging.register(
+            YourModel, weblogname='something', weblogurl='somethingelse')
     """
 
     if not all(hasattr(settings, key) for key in (
             'PINGING_WEBLOG_NAME', 'PINGING_WEBLOG_URL')):
-        raise ImproperlyConfigured, 'You have to specify PINGING_WEBLOG_NAME '\
-            'and PINGING_WEBLOG_URL to be able to use ``pinging.register``,'
+        raise ImproperlyConfigured(
+            'You have to specify PINGING_WEBLOG_NAME '
+            'and PINGING_WEBLOG_URL to be able to use ``pinging.register``,')
 
-    # reference must not be weak because the receiver is dynamically constructed here
-    signals.post_save.connect(curry(post_save_handler, **kwargs), sender=model, weak=False)
+    # reference must not be weak because the receiver is dynamically
+    # constructed here
+    signals.post_save.connect(
+        curry(post_save_handler, **kwargs),
+        sender=model,
+        weak=False)
 
 
 def post_save_handler(signal, sender, instance, created, **kwargs):

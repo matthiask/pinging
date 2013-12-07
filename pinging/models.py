@@ -10,27 +10,31 @@ from django.utils.translation import ugettext_lazy as _
 
 class PingedURLManager(models.Manager):
     def process_pending(self):
-        for item in self.filter(status=self.model.PENDING).select_related('server'):
+        for item in self.filter(status=self.model.PENDING).select_related(
+                'server'):
             try:
                 rpc = xmlrpclib.Server(item.server.url)
                 reply = rpc.weblogUpdates.ping(
                     item.weblogname,
                     item.weblogurl,
                     item.changesurl or item.weblogurl)
-                item.status = reply['flerror'] and self.model.FAILED or self.model.SUCCESSFUL
+                item.status = (
+                    self.model.FAILED if reply['flerror']
+                    else self.model.SUCCESSFUL)
                 item.message = reply['message']
-            except socket.error, msg:
+            except socket.error as exc:
                 item.status = self.model.ERROR
-                item.message = u'Socket error'
-            except xmlrpclib.ProtocolError, e:
+                item.message = u'Socket error: %s' % (repr(exc),)
+            except xmlrpclib.ProtocolError as exc:
                 item.status = self.model.ERROR
-                item.message = u'Protocol error: %s, %s, %s' % (e.errcode, e.errmsg, e.url)
-            except xmlrpclib.Fault, e:
+                item.message = u'Protocol error: %s, %s, %s' % (
+                    exc.errcode, exc.errmsg, exc.url)
+            except xmlrpclib.Fault as exc:
                 item.status = self.model.ERROR
-                item.message = e.faultString
-            except Exception, e:
+                item.message = exc.faultString
+            except Exception as exc:
                 item.status = self.model.ERROR
-                item.message = u'Unknown error: %s' % (repr(e),)
+                item.message = u'Unknown error: %s' % (repr(exc),)
 
             item.save()
 
@@ -66,7 +70,7 @@ class PingedURL(models.Model):
         (FAILED, _('failed')),
         (SUCCESSFUL, _('successful')),
         (ERROR, _('error')),
-        )
+    )
 
     created = models.DateTimeField(_('created'), default=datetime.now)
     server = models.ForeignKey(PingServer)
@@ -77,18 +81,18 @@ class PingedURL(models.Model):
 
     weblogname = models.CharField(_('weblog name'), max_length=200)
     weblogurl = models.CharField(_('weblog URL'), max_length=200)
-    changesurl = models.CharField(_('changes URL'), max_length=200, blank=True,
-        default=u'')
+    changesurl = models.CharField(
+        _('changes URL'), max_length=200, blank=True, default=u'')
 
-    status = models.IntegerField(_('status'), choices=STATUS_CHOICES,
-        default=PENDING)
-    message = models.CharField(_('message'), max_length=200, blank=True,
-        default=u'')
+    status = models.IntegerField(
+        _('status'), choices=STATUS_CHOICES, default=PENDING)
+    message = models.CharField(
+        _('message'), max_length=200, blank=True, default=u'')
+
+    objects = PingedURLManager()
 
     class Meta:
         ordering = ['-created']
-
-    objects = PingedURLManager()
 
     def __unicode__(self):
         return self.changesurl or self.weblogurl
