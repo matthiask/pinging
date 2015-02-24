@@ -49,7 +49,7 @@ class PingedURLManager(models.Manager):
 
 
 class PingServer(models.Model):
-    url = models.URLField(_('url'), verify_exists=False)
+    url = models.URLField(_('url'), unique=True)
 
     def __unicode__(self):
         return self.url
